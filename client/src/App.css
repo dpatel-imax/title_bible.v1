@@ -15,13 +15,18 @@
 
 .App-header {
   background-color: #282c34;
-  min-height: 100vh;
+  min-height: unset;
+  height: 70px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  justify-content: flex-start;
+  font-size: 1.5rem;
   color: white;
+  padding: 0 2rem;
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .App-link {
@@ -38,18 +43,19 @@
 }
 
 .IMAX-logo {
-  position: absolute;
-  top: 20px;
-  left: 20px;
   height: 50px;
   width: auto;
+  margin-right: 2rem;
+  position: static;
+  top: unset;
+  left: unset;
   z-index: 10;
 }
 
 .Tabs {
   display: flex;
   gap: 1rem;
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .Tabs button {
@@ -57,10 +63,11 @@
   color: #fff;
   border: none;
   padding: 0.5rem 1.5rem;
-  font-size: 1.2rem;
-  border-radius: 5px 5px 0 0;
+  font-size: 1.1rem;
+  border-radius: 5px;
   cursor: pointer;
   transition: background 0.2s;
+  margin: 0;
 }
 
 .Tabs button.active {
@@ -71,4 +78,74 @@
 
 main {
   margin-top: 2rem;
+}
+
+.selected-year {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin: 0 1rem;
+}
+
+.year-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  justify-content: center;
+}
+
+.year-input-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.year-input {
+  width: 90px;
+  padding: 0.3rem 0.5rem;
+  font-size: 1rem;
+}
+
+.movie-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  justify-content: center;
+}
+
+.movie-card {
+  background: #fff;
+  color: #222;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  width: 160px;
+  padding: 1rem 0.5rem 0.5rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: box-shadow 0.2s;
+}
+
+.movie-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+
+.movie-poster {
+  width: 100px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.movie-title {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.2rem;
+}
+
+.movie-date, .movie-revenue {
+  font-size: 0.95rem;
+  text-align: center;
+  margin-bottom: 0.1rem;
 }
