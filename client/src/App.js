@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import Select from 'react-select';
 import './App.css';
 
 // Placeholder IMAX logo URL (replace with a real one if available)
@@ -8,6 +9,15 @@ const PLACEHOLDER_POSTER = 'https://via.placeholder.com/100x150?text=No+Image';
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
+];
+const MONTH_ABBR = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+];
+const MAJOR_MOVIE_RUN_DAYS = 14;
+const MAJOR_MOVIE_COUNT = 5;
+const MOVIE_COLORS = [
+  '#00bcd4', '#ff9800', '#8bc34a', '#e91e63', '#3f51b5', '#ff5722', '#9c27b0', '#607d8b', '#cddc39', '#f44336'
 ];
 
 function groupMoviesByMonth(movies) {
@@ -23,6 +33,59 @@ function groupMoviesByMonth(movies) {
   return groups;
 }
 
+function getIMAXMovies(movies) {
+  // For demo, treat all movies as IMAX if they have 'IMAX' in title or use a custom field if available
+  return movies.filter(m => (m.title && m.title.toLowerCase().includes('imax')) || m.imax === true);
+}
+
+function getDaysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+function getFirstDayOfMonth(year, month) {
+  return new Date(year, month, 1).getDay();
+}
+
+function getCurrentMonthYear() {
+  const now = new Date();
+  return { month: now.getMonth(), year: now.getFullYear() };
+}
+
+function getMajorMoviesWithColors(movies, year, month) {
+  const now = new Date();
+  const isFuture = year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth());
+  // Only movies released in this month/year
+  const monthMovies = movies.filter(m => {
+    const d = new Date(m.release_date);
+    return d.getFullYear() === year && d.getMonth() === month;
+  });
+  let sorted;
+  if (isFuture) {
+    sorted = monthMovies.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  } else {
+    sorted = monthMovies.sort((a, b) => (b.revenue || 0) - (a.revenue || 0));
+  }
+  // Assign a color to each movie (cycle through palette)
+  return sorted.slice(0, MAJOR_MOVIE_COUNT).map((movie, idx) => ({ ...movie, color: MOVIE_COLORS[idx % MOVIE_COLORS.length] }));
+}
+
+function getContinuingMovies(movies, year, month) {
+  // Find movies whose run started in the previous month and continues into this month
+  const prevMonth = month === 0 ? 11 : month - 1;
+  const prevYear = month === 0 ? year - 1 : year;
+  const majorPrev = getMajorMoviesWithColors(movies, prevYear, prevMonth);
+  const daysInPrevMonth = getDaysInMonth(prevYear, prevMonth);
+  return majorPrev.filter(movie => {
+    const start = new Date(movie.release_date);
+    const runEnd = new Date(start);
+    runEnd.setDate(start.getDate() + MAJOR_MOVIE_RUN_DAYS - 1);
+    // If runEnd is in this month/year and after the 1st
+    return (
+      runEnd.getFullYear() === year && runEnd.getMonth() === month && runEnd.getDate() >= 1
+    );
+  });
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('titles');
   const [movies, setMovies] = useState([]);
@@ -30,7 +93,68 @@ function App() {
   const [error, setError] = useState(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [yearInput, setYearInput] = useState('');
+  const [genres, setGenres] = useState([]);
+  const [selectedGenres, setSelectedGenres] = useState([]); // Multi-select
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchActive, setSearchActive] = useState(false);
+  const [searchedMovie, setSearchedMovie] = useState(null);
+  const [searchYear, setSearchYear] = useState(null); // Track year of searched movie
+  const searchInputRef = useRef(null);
 
+  // Calendar tab state
+  const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
+  const [calendarView, setCalendarView] = useState('month'); // 'month' or 'week'
+  const [calendarMonth, setCalendarMonth] = useState(currentMonth);
+  const [calendarYear, setCalendarYear] = useState(currentYear);
+  const [imaxMovies, setIMAXMovies] = useState([]);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarWeekStart, setCalendarWeekStart] = useState(null); // for week view
+  // Handler for opening month/year picker
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [pickerYear, setPickerYear] = useState(currentYear);
+  const openMonthPicker = () => {
+    setPickerYear(calendarYear);
+    setShowMonthPicker(true);
+  };
+  const closeMonthPicker = () => setShowMonthPicker(false);
+  const handlePickerYearChange = (dir) => setPickerYear(y => y + dir);
+  const handlePickerMonthClick = (monthIdx) => {
+    setCalendarYear(pickerYear);
+    setCalendarMonth(monthIdx);
+    setShowMonthPicker(false);
+  };
+
+  // Compute week label for week view
+  const weekLabel = useMemo(() => {
+    let weekStart = calendarWeekStart;
+    if (!weekStart) {
+      // Default to current week in current month
+      const today = new Date();
+      if (today.getFullYear() === calendarYear && today.getMonth() === calendarMonth) {
+        weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+      } else {
+        weekStart = new Date(calendarYear, calendarMonth, 1);
+      }
+    }
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      weekDays.push(d);
+    }
+    return `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getDate()} – ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getDate()}, ${weekDays[6].getFullYear()}`;
+  }, [calendarWeekStart, calendarMonth, calendarYear]);
+
+  // Fetch genres on mount
+  useEffect(() => {
+    fetch('http://localhost:5000/api/genres')
+      .then(res => res.json())
+      .then(data => setGenres(data.genres || []));
+  }, []);
+
+  // Fetch movies for selected year
   useEffect(() => {
     if (activeTab === 'titles') {
       setLoading(true);
@@ -47,6 +171,20 @@ function App() {
         });
     }
   }, [activeTab, selectedYear]);
+
+  // Fetch IMAX movies for calendar tab
+  useEffect(() => {
+    if (activeTab === 'calendar') {
+      setCalendarLoading(true);
+      fetch(`http://localhost:5000/api/movies?year=${calendarYear}`)
+        .then(res => res.json())
+        .then(data => {
+          setIMAXMovies(data.results || []); // now holds all movies for the year
+          setCalendarLoading(false);
+        })
+        .catch(() => setCalendarLoading(false));
+    }
+  }, [activeTab, calendarYear]);
 
   // Only allow navigation between years 2000 and 2100
   const minYear = 2000;
@@ -68,7 +206,278 @@ function App() {
     setYearInput('');
   };
 
-  const grouped = groupMoviesByMonth(movies);
+  // react-select expects options as { value, label }
+  const genreOptions = genres.map(g => ({ value: g.id, label: g.name }));
+
+  // Multi-select genre filter handler
+  const handleGenreSelect = (selected) => {
+    setSelectedGenres(selected ? selected.map(opt => opt.value) : []);
+  };
+
+  // Filter movies by selected genres (if any selected)
+  const filteredMovies = selectedGenres.length === 0
+    ? movies
+    : movies.filter((movie) =>
+        selectedGenres.every((gid) => (movie.genre_ids || []).includes(gid))
+      );
+
+  // Search bar logic (search only within filteredMovies for the current year)
+  useEffect(() => {
+    if (searchTerm.length > 0) {
+      const results = filteredMovies.filter(movie =>
+        movie.title.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setSearchResults(results.slice(0, 8)); // Show up to 8 suggestions
+    } else {
+      setSearchResults([]);
+    }
+  }, [searchTerm, filteredMovies]);
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+    setSearchActive(true);
+  };
+
+  const handleSearchSelect = (movie) => {
+    setSearchedMovie(movie);
+    setSearchYear(new Date(movie.release_date).getFullYear());
+    setSearchTerm(movie.title);
+    setSearchActive(false);
+    setTimeout(() => {
+      if (searchInputRef.current) searchInputRef.current.blur();
+    }, 100);
+  };
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (searchResults.length > 0) {
+      handleSearchSelect(searchResults[0]);
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setSearchedMovie(null);
+    setSearchActive(false);
+    if (searchYear !== null) {
+      setSelectedYear(searchYear);
+      setSearchYear(null);
+    }
+  };
+
+  // If a movie is searched, only show that movie
+  const moviesToShow = searchedMovie
+    ? [searchedMovie]
+    : filteredMovies;
+
+  const grouped = groupMoviesByMonth(moviesToShow);
+
+  // Calendar tab handlers
+  const handleCalendarView = (view) => setCalendarView(view);
+  const handleCalendarMonthChange = (dir) => {
+    if (dir === 'left') {
+      if (calendarMonth === 0) {
+        setCalendarMonth(11);
+        setCalendarYear(calendarYear - 1);
+      } else {
+        setCalendarMonth(calendarMonth - 1);
+      }
+    } else if (dir === 'right') {
+      if (calendarMonth === 11) {
+        setCalendarMonth(0);
+        setCalendarYear(calendarYear + 1);
+      } else {
+        setCalendarMonth(calendarMonth + 1);
+      }
+    }
+  };
+
+  // Build calendar grid for month view
+  function renderCalendarMonth() {
+    const daysInMonth = getDaysInMonth(calendarYear, calendarMonth);
+    const firstDay = getFirstDayOfMonth(calendarYear, calendarMonth);
+    // Build a 6-row calendar grid
+    const weeks = [];
+    let day = 1 - firstDay;
+    for (let w = 0; w < 6; w++) {
+      const week = [];
+      for (let d = 0; d < 7; d++, day++) {
+        if (day < 1 || day > daysInMonth) {
+          week.push(null);
+        } else {
+          week.push(day);
+        }
+      }
+      weeks.push(week);
+    }
+    // Get top 5 major movies for this month
+    const majorMovies = getMajorMoviesWithColors(imaxMovies, calendarYear, calendarMonth);
+    // Map major movies to their run days
+    const majorMap = {};
+    majorMovies.forEach(movie => {
+      const start = new Date(movie.release_date);
+      for (let i = 0; i < MAJOR_MOVIE_RUN_DAYS; i++) {
+        const dayNum = start.getDate() + i;
+        if (dayNum > daysInMonth) break;
+        if (!majorMap[dayNum]) majorMap[dayNum] = [];
+        majorMap[dayNum].push({
+          ...movie,
+          isFirst: i === 0,
+          color: movie.color
+        });
+      }
+    });
+    // Add continuing movies from previous month
+    const continuingMovies = getContinuingMovies(imaxMovies, calendarYear, calendarMonth);
+    continuingMovies.forEach((movie) => {
+      const start = new Date(movie.release_date);
+      const runEnd = new Date(start);
+      runEnd.setDate(start.getDate() + MAJOR_MOVIE_RUN_DAYS - 1);
+      // The first day in this month the movie is still running
+      const firstDay = 1;
+      const lastDay = Math.min(runEnd.getDate(), daysInMonth);
+      for (let dayNum = firstDay; dayNum <= lastDay; dayNum++) {
+        if (!majorMap[dayNum]) majorMap[dayNum] = [];
+        majorMap[dayNum].push({
+          ...movie,
+          isFirst: dayNum === 1, // reprint name on first day of new month
+          color: movie.color
+        });
+      }
+    });
+    // Render calendar
+    return (
+      <table className="calendar-table">
+        <thead>
+          <tr>
+            <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
+          </tr>
+        </thead>
+        <tbody>
+          {weeks.map((week, wi) => (
+            <tr key={wi}>
+              {week.map((dayNum, di) => (
+                <td key={di} className={majorMap[dayNum] ? 'imax-day' : ''}>
+                  {dayNum && (
+                    <div className="calendar-day">
+                      <div className="calendar-date">{dayNum}</div>
+                      {majorMap[dayNum] && majorMap[dayNum].map((movie, mi) => (
+                        <div
+                          key={movie.id}
+                          className={movie.isFirst ? 'imax-movie imax-movie-first' : 'imax-movie'}
+                          style={{ background: movie.color }}
+                        >
+                          {movie.isFirst ? movie.title : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  }
+
+  // Build week view (current week of calendarMonth)
+  function renderCalendarWeek() {
+    // Determine week start
+    let weekStart = calendarWeekStart;
+    if (!weekStart) {
+      // Default to current week in current month
+      const today = new Date();
+      if (today.getFullYear() === calendarYear && today.getMonth() === calendarMonth) {
+        weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+      } else {
+        weekStart = new Date(calendarYear, calendarMonth, 1);
+      }
+    }
+    // Build week days
+    const weekDays = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      weekDays.push(d);
+    }
+    // Get up to 5 major movies for this month, assign colors
+    const majorMovies = getMajorMoviesWithColors(imaxMovies, calendarYear, calendarMonth);
+    // Map major movies to their run days
+    const majorMap = {};
+    majorMovies.forEach((movie, colorIdx) => {
+      const start = new Date(movie.release_date);
+      for (let i = 0; i < MAJOR_MOVIE_RUN_DAYS; i++) {
+        const dayNum = start.getDate() + i;
+        if (!majorMap[dayNum]) majorMap[dayNum] = [];
+        majorMap[dayNum].push({
+          ...movie,
+          isFirst: i === 0,
+          color: movie.color
+        });
+      }
+    });
+    return (
+      <table className="calendar-table">
+        <thead>
+          <tr>
+            <th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {weekDays.map((d, i) => {
+              const dayNum = d.getMonth() === calendarMonth ? d.getDate() : null;
+              return (
+                <td key={i} className={majorMap[dayNum] ? 'imax-day' : ''}>
+                  {dayNum && (
+                    <div className="calendar-day">
+                      <div className="calendar-date">{dayNum}</div>
+                      {majorMap[dayNum] && majorMap[dayNum].map((movie, mi) => (
+                        <div
+                          key={movie.id}
+                          className={movie.isFirst ? 'imax-movie imax-movie-first' : 'imax-movie'}
+                        >
+                          {movie.isFirst ? movie.title : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </td>
+              );
+            })}
+          </tr>
+        </tbody>
+      </table>
+    );
+  }
+
+  // Calendar week navigation
+  const handleCalendarWeekChange = (dir) => {
+    let weekStart = calendarWeekStart;
+    if (!weekStart) {
+      weekStart = new Date(calendarYear, calendarMonth, 1);
+    }
+    if (dir === 'left') {
+      weekStart.setDate(weekStart.getDate() - 7);
+    } else if (dir === 'right') {
+      weekStart.setDate(weekStart.getDate() + 7);
+    }
+    setCalendarWeekStart(new Date(weekStart));
+  };
+
+  // When switching to month view, reset week start and week label
+  useEffect(() => {
+    if (calendarView === 'month') {
+      setCalendarWeekStart(null);
+    }
+  }, [calendarView]);
+
+  // When changing month/year, reset week start and week label
+  useEffect(() => {
+    setCalendarWeekStart(null);
+  }, [calendarMonth, calendarYear]);
 
   return (
     <div className="App">
@@ -89,6 +498,34 @@ function App() {
           </button>
         </div>
       </header>
+      {/* Search Bar */}
+      {activeTab === 'titles' && (
+        <div className="search-bar-container search-bar-centered">
+          <form onSubmit={handleSearchSubmit} className="search-bar-form">
+            <input
+              type="text"
+              placeholder="Search movie title..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="search-bar-input"
+              ref={searchInputRef}
+              autoComplete="off"
+            />
+            {searchTerm && (
+              <button type="button" className="clear-search-btn" onClick={handleClearSearch}>&times;</button>
+            )}
+            {searchActive && searchResults.length > 0 && (
+              <ul className="search-suggestions">
+                {searchResults.map(movie => (
+                  <li key={movie.id} onClick={() => handleSearchSelect(movie)}>
+                    {movie.title} <span style={{color:'#888',fontSize:'0.9em'}}>({new Date(movie.release_date).getFullYear()})</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </form>
+        </div>
+      )}
       <main>
         {activeTab === 'titles' ? (
           <div>
@@ -108,6 +545,17 @@ function App() {
                 />
                 <button type="submit">Go</button>
               </form>
+            </div>
+            {/* Genre Filter */}
+            <div className="genre-filter" style={{ maxWidth: 400, margin: '0 auto 1.5rem auto' }}>
+              <Select
+                isMulti
+                options={genreOptions}
+                value={genreOptions.filter(opt => selectedGenres.includes(opt.value))}
+                onChange={handleGenreSelect}
+                placeholder="Filter by genre(s)..."
+                classNamePrefix="react-select"
+              />
             </div>
             {loading && <div>Loading movies...</div>}
             {error && <div style={{ color: 'red' }}>{error}</div>}
@@ -143,7 +591,64 @@ function App() {
             )}
           </div>
         ) : (
-          <div>Calendar content goes here</div>
+          <div>
+            <div className="calendar-controls">
+              <button
+                className={calendarView === 'month' ? 'active' : ''}
+                onClick={() => handleCalendarView('month')}
+              >
+                Month
+              </button>
+              <button
+                className={calendarView === 'week' ? 'active' : ''}
+                onClick={() => handleCalendarView('week')}
+              >
+                Week
+              </button>
+              <span className="calendar-month-label">
+                <button onClick={() => calendarView === 'week' ? handleCalendarWeekChange('left') : handleCalendarMonthChange('left')}>&lt;</button>
+                {calendarView === 'month' ? (
+                  <button className="month-picker-btn" onClick={openMonthPicker}>
+                    {MONTHS[calendarMonth]} {calendarYear}
+                  </button>
+                ) : weekLabel}
+                <button onClick={() => calendarView === 'week' ? handleCalendarWeekChange('right') : handleCalendarMonthChange('right')}>&gt;</button>
+              </span>
+            </div>
+            {showMonthPicker && (
+              <div className="month-picker-modal-overlay" onClick={closeMonthPicker}>
+                <div className="month-picker-modal" onClick={e => e.stopPropagation()}>
+                  <div className="month-picker-modal-header">
+                    <button className="month-picker-arrow" onClick={() => handlePickerYearChange(-1)}>&lt;</button>
+                    <span className="month-picker-modal-year">{pickerYear}</span>
+                    <button className="month-picker-arrow" onClick={() => handlePickerYearChange(1)}>&gt;</button>
+                  </div>
+                  <div className="month-picker-modal-grid">
+                    {MONTH_ABBR.map((abbr, idx) => (
+                      <button
+                        key={abbr}
+                        className={
+                          idx === calendarMonth && pickerYear === calendarYear
+                            ? 'month-picker-modal-month active'
+                            : 'month-picker-modal-month'
+                        }
+                        onClick={() => handlePickerMonthClick(idx)}
+                      >
+                        {abbr}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {calendarLoading ? (
+              <div>Loading major movies...</div>
+            ) : (
+              <div className="calendar-wrapper">
+                {calendarView === 'month' ? renderCalendarMonth() : renderCalendarWeek()}
+              </div>
+            )}
+          </div>
         )}
       </main>
     </div>

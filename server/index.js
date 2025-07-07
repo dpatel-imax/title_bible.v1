@@ -62,5 +62,17 @@ app.get('/api/movies', async (req, res) => {
   }
 });
 
+app.get('/api/genres', async (req, res) => {
+  try {
+    const response = await axios.get(
+      `https://api.themoviedb.org/3/genre/movie/list?api_key=${TMDB_API_KEY}`
+    );
+    res.json(response.data);
+  } catch (error) {
+    console.error(error.response ? error.response.data : error.message);
+    res.status(500).json({ error: 'Failed to fetch genres', details: error.response ? error.response.data : error.message });
+  }
+});
+
 const PORT = 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`)); 
