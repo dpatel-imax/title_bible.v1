@@ -5,7 +5,9 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
-const TMDB_API_KEY = '748c3731cffe441f6d75e4711d940d54'; // Replace with your actual API key
+const TMDB_API_KEY = '748c3731cffe441f6d75e4711d940d54'; 
+const OMDB_API_KEY = 'fda16873'; 
+const omdbCache = {};
 
 async function fetchMoviesForYear(year) {
   let allResults = [];
@@ -96,6 +98,31 @@ app.get('/api/genres', async (req, res) => {
   } catch (error) {
     console.error(error.response ? error.response.data : error.message);
     res.status(500).json({ error: 'Failed to fetch genres', details: error.response ? error.response.data : error.message });
+  }
+});
+
+app.get('/api/omdb-rating', async (req, res) => {
+  try {
+    const { imdb_id, title, year } = req.query;
+    let cacheKey = imdb_id || `${title}_${year}`;
+    if (omdbCache[cacheKey]) {
+      return res.json({ imdbRating: omdbCache[cacheKey] });
+    }
+    let url;
+    if (imdb_id) {
+      url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdb_id}`;
+    } else if (title) {
+      url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}${year ? `&y=${year}` : ''}`;
+    } else {
+      return res.status(400).json({ error: 'imdb_id or title required' });
+    }
+    console.log('OMDb URL:', url); // Debug log
+    const response = await axios.get(url);
+    const imdbRating = response.data.imdbRating || null;
+    omdbCache[cacheKey] = imdbRating;
+    res.json({ imdbRating });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch OMDb rating', details: error.message });
   }
 });
 
