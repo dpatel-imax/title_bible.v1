@@ -86,6 +86,51 @@ function getContinuingMovies(movies, year, month) {
   });
 }
 
+// Helper: get movies array for current year or other years
+function getMoviesArray(movies, selectedYear) {
+  if (selectedYear === new Date().getFullYear()) {
+    // For current year, combine released and upcoming for month grouping, or use as needed
+    if (!movies) return [];
+    if (Array.isArray(movies)) return movies;
+    // For grouping by month, combine both
+    return [...(movies.released || []), ...(movies.upcoming || [])];
+  }
+  return Array.isArray(movies) ? movies : [];
+}
+
+function getTitlesTabMoviesByMonth(movies, year) {
+  if (!Array.isArray(movies)) {
+    movies = movies && Array.isArray(movies.results) ? movies.results : [];
+  }
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+  // Group movies by month
+  const grouped = {};
+  for (let m = 0; m < 12; m++) {
+    // Only movies released in this month/year
+    const monthMovies = movies.filter(movie => {
+      if (!movie.release_date) return false;
+      const d = new Date(movie.release_date);
+      return d.getFullYear() === year && d.getMonth() === m;
+    });
+    let sorted;
+    if (year < currentYear || (year === currentYear && m < currentMonth)) {
+      // Past months: top 15 by revenue
+      sorted = monthMovies
+        .filter(mov => mov.revenue > 0)
+        .sort((a, b) => b.revenue - a.revenue)
+        .slice(0, 15);
+    } else {
+      // Current/future months: show all movies sorted by release date
+      sorted = monthMovies
+        .sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+    }
+    if (sorted.length > 0) grouped[m] = sorted;
+  }
+  return grouped;
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('titles');
   const [movies, setMovies] = useState([]);
@@ -162,7 +207,14 @@ function App() {
       fetch(`http://localhost:5000/api/movies?year=${selectedYear}`)
         .then((res) => res.json())
         .then((data) => {
-          setMovies(data.results || []);
+          console.log("Fetched movies for year:", selectedYear, data);
+          if (data.results) {
+            setMovies(data.results);
+          } else if (data.released || data.upcoming) {
+            setMovies({ released: data.released || [], upcoming: data.upcoming || [] });
+          } else {
+            setMovies([]);
+          }
           setLoading(false);
         })
         .catch((err) => {
@@ -179,7 +231,13 @@ function App() {
       fetch(`http://localhost:5000/api/movies?year=${calendarYear}`)
         .then(res => res.json())
         .then(data => {
-          setIMAXMovies(data.results || []); // now holds all movies for the year
+          if (data.results) {
+            setIMAXMovies(data.results);
+          } else if (data.released || data.upcoming) {
+            setIMAXMovies([...(data.released || []), ...(data.upcoming || [])]);
+          } else {
+            setIMAXMovies([]);
+          }
           setCalendarLoading(false);
         })
         .catch(() => setCalendarLoading(false));
@@ -215,11 +273,14 @@ function App() {
   };
 
   // Filter movies by selected genres (if any selected)
-  const filteredMovies = selectedGenres.length === 0
-    ? movies
-    : movies.filter((movie) =>
-        selectedGenres.every((gid) => (movie.genre_ids || []).includes(gid))
-      );
+  const filteredMovies = useMemo(() => {
+    if (selectedGenres.length === 0) {
+      return getMoviesArray(movies, selectedYear);
+    }
+    return getMoviesArray(movies, selectedYear).filter((movie) =>
+      selectedGenres.every((gid) => (movie.genre_ids || []).includes(gid))
+    );
+  }, [movies, selectedYear, selectedGenres]);
 
   // Search bar logic (search only within filteredMovies for the current year)
   useEffect(() => {
@@ -270,7 +331,11 @@ function App() {
     ? [searchedMovie]
     : filteredMovies;
 
-  const grouped = groupMoviesByMonth(moviesToShow);
+  const grouped = groupMoviesByMonth(getMoviesArray(moviesToShow, selectedYear));
+
+  const titlesTabGrouped = useMemo(() => {
+    return getTitlesTabMoviesByMonth(getMoviesArray(movies, selectedYear), selectedYear);
+  }, [movies, selectedYear]);
 
   // Calendar tab handlers
   const handleCalendarView = (view) => setCalendarView(view);
@@ -311,7 +376,7 @@ function App() {
       weeks.push(week);
     }
     // Get top 5 major movies for this month
-    const majorMovies = getMajorMoviesWithColors(imaxMovies, calendarYear, calendarMonth);
+    const majorMovies = getMajorMoviesWithColors(getMoviesArray(imaxMovies, calendarYear), calendarYear, calendarMonth);
     // Map major movies to their run days
     const majorMap = {};
     majorMovies.forEach(movie => {
@@ -328,7 +393,7 @@ function App() {
       }
     });
     // Add continuing movies from previous month
-    const continuingMovies = getContinuingMovies(imaxMovies, calendarYear, calendarMonth);
+    const continuingMovies = getContinuingMovies(getMoviesArray(imaxMovies, calendarYear), calendarYear, calendarMonth);
     continuingMovies.forEach((movie) => {
       const start = new Date(movie.release_date);
       const runEnd = new Date(start);
@@ -403,7 +468,7 @@ function App() {
       weekDays.push(d);
     }
     // Get up to 5 major movies for this month, assign colors
-    const majorMovies = getMajorMoviesWithColors(imaxMovies, calendarYear, calendarMonth);
+    const majorMovies = getMajorMoviesWithColors(getMoviesArray(imaxMovies, calendarYear), calendarYear, calendarMonth);
     // Map major movies to their run days
     const majorMap = {};
     majorMovies.forEach((movie, colorIdx) => {
@@ -559,34 +624,45 @@ function App() {
             </div>
             {loading && <div>Loading movies...</div>}
             {error && <div style={{ color: 'red' }}>{error}</div>}
-            {!loading && !error && movies.length > 0 && (
+            {(!loading && !error && (
+              (Array.isArray(movies) ? movies.length > 0 : (movies.released && movies.released.length > 0) || (movies.upcoming && movies.upcoming.length > 0))
+            )) && (
               <div>
-                {MONTHS.filter(month => grouped[month]).map((month) => (
-                  <div key={month} style={{ marginBottom: '2rem' }}>
-                    <h2>{month} {selectedYear}</h2>
-                    <div className="movie-list">
-                      {grouped[month].map((movie) => (
-                        <div className="movie-card" key={movie.id}>
-                          <img
-                            src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
-                            alt={movie.title}
-                            className="movie-poster"
-                          />
-                          <div className="movie-info">
-                            <div className="movie-title">{movie.title}</div>
-                            <div className="movie-date">{movie.release_date}</div>
-                            {movie.revenue !== undefined && movie.revenue > 0 && (
-                              <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>
-                            )}
+                {MONTHS.map((month, idx) => (
+                  titlesTabGrouped[idx] ? (
+                    <div key={month} style={{ marginBottom: '2rem' }}>
+                      <h2>{month} {selectedYear}</h2>
+                      <div className="movie-list">
+                        {titlesTabGrouped[idx].map((movie) => (
+                          <div className="movie-card" key={movie.id}>
+                            <img
+                              src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
+                              alt={movie.title}
+                              className="movie-poster"
+                            />
+                            <div className="movie-info">
+                              <div className="movie-title">{movie.title}</div>
+                              <div className="movie-date">{movie.release_date}</div>
+                              {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
+                                movie.revenue > 0 && <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null
                 ))}
               </div>
             )}
-            {!loading && !error && movies.length === 0 && (
+            {(!loading && !error &&
+              (
+                (Array.isArray(movies) && movies.length === 0) ||
+                (movies.released && movies.released.length === 0 && movies.upcoming && movies.upcoming.length === 0)
+              ) &&
+              // Only show for past years or current year, not for future years
+              selectedYear <= new Date().getFullYear()
+            ) && (
               <div>No movies found for {selectedYear}.</div>
             )}
           </div>
