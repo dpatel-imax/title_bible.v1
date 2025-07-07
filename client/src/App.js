@@ -195,7 +195,7 @@ function App() {
 
   // Fetch genres on mount
   useEffect(() => {
-    fetch('http://localhost:5000/api/genres')
+    fetch('https://title-bible.onrender.com/api/genres')
       .then(res => res.json())
       .then(data => setGenres(data.genres || []));
   }, []);
@@ -205,7 +205,7 @@ function App() {
     if (activeTab === 'titles') {
       setLoading(true);
       setError(null);
-      fetch(`http://localhost:5000/api/movies?year=${selectedYear}`)
+      fetch(`https://title-bible.onrender.com/api/movies?year=${selectedYear}`)
         .then((res) => res.json())
         .then((data) => {
           if (data.results) {
@@ -228,7 +228,7 @@ function App() {
   useEffect(() => {
     if (activeTab === 'calendar') {
       setCalendarLoading(true);
-      fetch(`http://localhost:5000/api/movies?year=${calendarYear}`)
+      fetch(`https://title-bible.onrender.com/api/movies?year=${calendarYear}`)
         .then(res => res.json())
         .then(data => {
           if (data.results) {
@@ -343,7 +343,7 @@ function App() {
       const moviesForRatings = Array.isArray(moviesToShow) ? moviesToShow : [];
       moviesForRatings.forEach(movie => {
         if (movie && movie.id && ratings[movie.id] === undefined && movie.title && movie.release_date) {
-          fetch(`http://localhost:5000/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
+          fetch(`https://title-bible.onrender.com/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
             .then(res => res.json())
             .then(data => {
               setRatings(r => ({ ...r, [movie.id]: data.imdbRating || 'N/A' }));
