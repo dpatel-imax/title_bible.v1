@@ -159,6 +159,7 @@ main {
   padding: 0 0 1rem 0;
   position: relative;
   z-index: 20;
+  flex: 1;
 }
 
 .search-bar-centered {
@@ -173,11 +174,15 @@ main {
 .search-bar-form {
   position: relative;
   width: 100%;
-  max-width: 100%;
+  max-width: 400px;
+  display: flex;
+  align-items: center;
 }
 
 .search-bar-input {
-  width: 100%;
+  width: 350px;
+  max-width: 100%;
+  margin-left: 2rem;
   padding: 0.5rem 2.2rem 0.5rem 0.7rem;
   font-size: 1rem;
   border-radius: 5px;
@@ -522,4 +527,79 @@ main {
   background: #61dafb;
   color: #222;
   font-weight: bold;
+}
+
+.titles-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  margin-bottom: 1rem;
+  width: 100%;
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+  margin-top: 2rem;
+}
+
+.year-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.search-bar-container {
+  flex: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.search-bar-form {
+  width: 100%;
+  max-width: 400px;
+}
+
+@media (max-width: 900px) {
+  .titles-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    max-width: 100%;
+  }
+  .year-nav,
+  .search-bar-container {
+    width: 100%;
+    justify-content: center;
+  }
+  .year-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 1rem;
+  }
+  .search-bar-container {
+    width: 100%;
+    margin: 0 auto 1rem auto;
+    display: flex;
+    justify-content: center;
+  }
+  .search-bar-form {
+    width: 100%;
+    max-width: 100%;
+  }
+  .search-bar-input {
+    width: 180px;
+    margin-left: 1rem;
+  }
+  .year-input-form {
+    margin-top: 0.5rem;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+  .year-input {
+    width: 100px;
+    margin-right: 0.5rem;
+  }
 }

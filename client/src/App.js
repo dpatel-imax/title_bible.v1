@@ -146,6 +146,7 @@ function App() {
   const [searchedMovie, setSearchedMovie] = useState(null);
   const [searchYear, setSearchYear] = useState(null); // Track year of searched movie
   const searchInputRef = useRef(null);
+  const [ratings, setRatings] = useState({});
 
   // Calendar tab state
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
@@ -207,7 +208,6 @@ function App() {
       fetch(`http://localhost:5000/api/movies?year=${selectedYear}`)
         .then((res) => res.json())
         .then((data) => {
-          console.log("Fetched movies for year:", selectedYear, data);
           if (data.results) {
             setMovies(data.results);
           } else if (data.released || data.upcoming) {
@@ -336,6 +336,25 @@ function App() {
   const titlesTabGrouped = useMemo(() => {
     return getTitlesTabMoviesByMonth(getMoviesArray(movies, selectedYear), selectedYear);
   }, [movies, selectedYear]);
+
+  // Fetch IMDb ratings for visible movies in Titles tab
+  useEffect(() => {
+    if (activeTab === 'titles') {
+      const moviesForRatings = Array.isArray(moviesToShow) ? moviesToShow : [];
+      moviesForRatings.forEach(movie => {
+        if (movie && movie.id && ratings[movie.id] === undefined && movie.title && movie.release_date) {
+          fetch(`http://localhost:5000/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
+            .then(res => res.json())
+            .then(data => {
+              setRatings(r => ({ ...r, [movie.id]: data.imdbRating || 'N/A' }));
+            })
+            .catch(() => {
+              setRatings(r => ({ ...r, [movie.id]: 'N/A' }));
+            });
+        }
+      });
+    }
+  }, [moviesToShow, activeTab]);
 
   // Calendar tab handlers
   const handleCalendarView = (view) => setCalendarView(view);
@@ -565,52 +584,54 @@ function App() {
       </header>
       {/* Search Bar */}
       {activeTab === 'titles' && (
-        <div className="search-bar-container search-bar-centered">
-          <form onSubmit={handleSearchSubmit} className="search-bar-form">
-            <input
-              type="text"
-              placeholder="Search movie title..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="search-bar-input"
-              ref={searchInputRef}
-              autoComplete="off"
-            />
-            {searchTerm && (
-              <button type="button" className="clear-search-btn" onClick={handleClearSearch}>&times;</button>
-            )}
-            {searchActive && searchResults.length > 0 && (
-              <ul className="search-suggestions">
-                {searchResults.map(movie => (
-                  <li key={movie.id} onClick={() => handleSearchSelect(movie)}>
-                    {movie.title} <span style={{color:'#888',fontSize:'0.9em'}}>({new Date(movie.release_date).getFullYear()})</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </form>
+        <div className="titles-header">
+          <div className="year-nav">
+            <button onClick={() => handleArrow('left')} disabled={selectedYear <= minYear}>&lt;</button>
+            <span className="selected-year">{selectedYear}</span>
+            <button onClick={() => handleArrow('right')} disabled={selectedYear >= maxYear}>&gt;</button>
+            <form onSubmit={handleYearInputSubmit} className="year-input-form">
+              <input
+                type="number"
+                min={minYear}
+                max={maxYear}
+                value={yearInput}
+                onChange={handleYearInput}
+                placeholder="Go to year"
+                className="year-input"
+              />
+              <button type="submit">Go</button>
+            </form>
+          </div>
+          <div className="search-bar-container search-bar-centered">
+            <form onSubmit={handleSearchSubmit} className="search-bar-form">
+              <input
+                type="text"
+                placeholder="Search movie title..."
+                value={searchTerm}
+                onChange={handleSearchChange}
+                className="search-bar-input"
+                ref={searchInputRef}
+                autoComplete="off"
+              />
+              {searchTerm && (
+                <button type="button" className="clear-search-btn" onClick={handleClearSearch}>&times;</button>
+              )}
+              {searchActive && searchResults.length > 0 && (
+                <ul className="search-suggestions">
+                  {searchResults.map(movie => (
+                    <li key={movie.id} onClick={() => handleSearchSelect(movie)}>
+                      {movie.title} <span style={{color:'#888',fontSize:'0.9em'}}>({new Date(movie.release_date).getFullYear()})</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </form>
+          </div>
         </div>
       )}
       <main>
         {activeTab === 'titles' ? (
           <div>
-            <div className="year-nav">
-              <button onClick={() => handleArrow('left')} disabled={selectedYear <= minYear}>&lt;</button>
-              <span className="selected-year">{selectedYear}</span>
-              <button onClick={() => handleArrow('right')} disabled={selectedYear >= maxYear}>&gt;</button>
-              <form onSubmit={handleYearInputSubmit} className="year-input-form">
-                <input
-                  type="number"
-                  min={minYear}
-                  max={maxYear}
-                  value={yearInput}
-                  onChange={handleYearInput}
-                  placeholder="Go to year"
-                  className="year-input"
-                />
-                <button type="submit">Go</button>
-              </form>
-            </div>
             {/* Genre Filter */}
             <div className="genre-filter" style={{ maxWidth: 400, margin: '0 auto 1.5rem auto' }}>
               <Select
@@ -625,34 +646,65 @@ function App() {
             {loading && <div>Loading movies...</div>}
             {error && <div style={{ color: 'red' }}>{error}</div>}
             {(!loading && !error && (
-              (Array.isArray(movies) ? movies.length > 0 : (movies.released && movies.released.length > 0) || (movies.upcoming && movies.upcoming.length > 0))
+              searchedMovie ? true : (Array.isArray(movies) ? movies.length > 0 : (movies.released && movies.released.length > 0) || (movies.upcoming && movies.upcoming.length > 0))
             )) && (
               <div>
-                {MONTHS.map((month, idx) => (
-                  titlesTabGrouped[idx] ? (
-                    <div key={month} style={{ marginBottom: '2rem' }}>
-                      <h2>{month} {selectedYear}</h2>
-                      <div className="movie-list">
-                        {titlesTabGrouped[idx].map((movie) => (
-                          <div className="movie-card" key={movie.id}>
-                            <img
-                              src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
-                              alt={movie.title}
-                              className="movie-poster"
-                            />
-                            <div className="movie-info">
-                              <div className="movie-title">{movie.title}</div>
-                              <div className="movie-date">{movie.release_date}</div>
-                              {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
-                                movie.revenue > 0 && <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>
-                              ) : null}
-                            </div>
+                {searchedMovie ? (
+                  <div className="movie-list">
+                    <div className="movie-card" key={searchedMovie.id}>
+                      <img
+                        src={searchedMovie.poster_path ? `${TMDB_IMAGE_BASE}${searchedMovie.poster_path}` : PLACEHOLDER_POSTER}
+                        alt={searchedMovie.title}
+                        className="movie-poster"
+                      />
+                      <div className="movie-info">
+                        <div className="movie-title">{searchedMovie.title}</div>
+                        <div className="movie-date">{searchedMovie.release_date}</div>
+                        {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && new Date(searchedMovie.release_date).getMonth() < new Date().getMonth()) ? (
+                          searchedMovie.revenue > 0 && <div className="movie-revenue">Box Office: ${searchedMovie.revenue.toLocaleString()}</div>
+                        ) : null}
+                        {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && new Date(searchedMovie.release_date).getMonth() < new Date().getMonth()) ? (
+                          <div className="movie-rating">
+                            IMDb Rating:<br/>
+                            {ratings[searchedMovie.id] && ratings[searchedMovie.id] !== 'N/A' ? `${ratings[searchedMovie.id]}/10` : 'N/A'}
                           </div>
-                        ))}
+                        ) : null}
                       </div>
                     </div>
-                  ) : null
-                ))}
+                  </div>
+                ) : (
+                  MONTHS.map((month, idx) => (
+                    titlesTabGrouped[idx] ? (
+                      <div key={month} style={{ marginBottom: '2rem' }}>
+                        <h2>{month} {selectedYear}</h2>
+                        <div className="movie-list">
+                          {titlesTabGrouped[idx].map((movie) => (
+                            <div className="movie-card" key={movie.id}>
+                              <img
+                                src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
+                                alt={movie.title}
+                                className="movie-poster"
+                              />
+                              <div className="movie-info">
+                                <div className="movie-title">{movie.title}</div>
+                                <div className="movie-date">{movie.release_date}</div>
+                                {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
+                                  movie.revenue > 0 && <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>
+                                ) : null}
+                                {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
+                                  <div className="movie-rating">
+                                    IMDb Rating:<br/>
+                                    {ratings[movie.id] && ratings[movie.id] !== 'N/A' ? `${ratings[movie.id]}/10` : 'N/A'}
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null
+                  ))
+                )}
               </div>
             )}
             {(!loading && !error &&
