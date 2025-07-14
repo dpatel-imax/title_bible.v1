@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
@@ -5,8 +6,9 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 
-const TMDB_API_KEY = '748c3731cffe441f6d75e4711d940d54'; 
-const OMDB_API_KEY = 'fda16873'; 
+const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const OMDB_API_KEY = process.env.OMDB_API_KEY;
+
 const omdbCache = {};
 
 async function fetchMoviesForYear(year) {
@@ -38,18 +40,32 @@ app.get('/api/movies', async (req, res) => {
     const today = new Date();
     let movies = await fetchMoviesForYear(year);
 
+    // Minimal deduplication by id
+    function deduplicateById(movieArray) {
+      const seen = new Set();
+      return movieArray.filter(movie => {
+        if (seen.has(movie.id)) return false;
+        seen.add(movie.id);
+        return true;
+      });
+    }
+
     if (year > currentYear) {
       // Future year: return all movies, sorted by release date
       movies = movies.filter(m => m.release_date);
+      movies = deduplicateById(movies);
       movies.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
       res.json({ results: movies });
     } else if (year === currentYear) {
       // Current year: split into released and upcoming
       const released = movies.filter(m => m.release_date && new Date(m.release_date) <= today);
       const upcoming = movies.filter(m => m.release_date && new Date(m.release_date) > today);
+      // Deduplicate
+      const dedupedReleased = deduplicateById(released);
+      const dedupedUpcoming = deduplicateById(upcoming);
       // Fetch revenue for released
       const withRevenue = await Promise.all(
-        released.map(async (movie) => {
+        dedupedReleased.map(async (movie) => {
           try {
             const revenue = await fetchMovieRevenue(movie.id);
             return { ...movie, revenue };
@@ -63,10 +79,11 @@ app.get('/api/movies', async (req, res) => {
         .sort((a, b) => b.revenue - a.revenue)
         .slice(0, 15);
       // Sort upcoming by release date
-      upcoming.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
-      res.json({ released: topGrossing, upcoming });
+      dedupedUpcoming.sort((a, b) => new Date(a.release_date) - new Date(b.release_date));
+      res.json({ released: topGrossing, upcoming: dedupedUpcoming });
     } else {
       // Past year: fetch revenue and return top 15 grossing
+      movies = deduplicateById(movies);
       const withRevenue = await Promise.all(
         movies.map(async (movie) => {
           try {
