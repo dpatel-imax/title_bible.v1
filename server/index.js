@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const cron = require('node-cron');
 
 const app = express();
 app.use(cors());
@@ -10,6 +11,10 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY;
 const OMDB_API_KEY = process.env.OMDB_API_KEY;
 
 const omdbCache = {};
+
+// In-memory cache for TMDB movie data
+const movieCache = {}; // { '2025': { data: [...], lastUpdated: Date } }
+const CACHE_TTL_HOURS = 24;
 
 async function fetchMoviesForYear(year) {
   let allResults = [];
@@ -26,6 +31,28 @@ async function fetchMoviesForYear(year) {
   return allResults;
 }
 
+async function fetchAndCacheMoviesForYear(year) {
+  const data = await fetchMoviesForYear(year);
+  movieCache[year] = {
+    data,
+    lastUpdated: new Date()
+  };
+  return data;
+}
+
+// Nightly refresh at 2am server time
+cron.schedule('0 2 * * *', async () => {
+  const years = Object.keys(movieCache);
+  for (const year of years) {
+    try {
+      await fetchAndCacheMoviesForYear(year);
+      console.log(`Refreshed TMDB cache for year ${year}`);
+    } catch (e) {
+      console.error(`Failed to refresh TMDB cache for year ${year}:`, e.message);
+    }
+  }
+});
+
 async function fetchMovieRevenue(movieId) {
   const response = await axios.get(
     `https://api.themoviedb.org/3/movie/${movieId}?api_key=${TMDB_API_KEY}`
@@ -38,7 +65,14 @@ app.get('/api/movies', async (req, res) => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const currentYear = new Date().getFullYear();
     const today = new Date();
-    let movies = await fetchMoviesForYear(year);
+    // Serve from cache if available and fresh
+    const cacheEntry = movieCache[year];
+    let movies;
+    if (cacheEntry && (new Date() - new Date(cacheEntry.lastUpdated)) < CACHE_TTL_HOURS * 60 * 60 * 1000) {
+      movies = cacheEntry.data;
+    } else {
+      movies = await fetchAndCacheMoviesForYear(year);
+    }
 
     // Minimal deduplication by id
     function deduplicateById(movieArray) {
