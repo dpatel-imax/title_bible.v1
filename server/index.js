@@ -43,9 +43,29 @@ async function fetchAndCacheMoviesForYear(year) {
 // Nightly refresh at 2am server time
 cron.schedule('0 2 * * *', async () => {
   const years = Object.keys(movieCache);
+  const currentYear = new Date().getFullYear();
   for (const year of years) {
     try {
-      await fetchAndCacheMoviesForYear(year);
+      // Refresh movie list
+      const movies = await fetchAndCacheMoviesForYear(year);
+
+      // If it's the current year, update revenue for all released movies
+      if (parseInt(year) === currentYear) {
+        const today = new Date();
+        const released = movies.filter(m => m.release_date && new Date(m.release_date) <= today);
+        for (const movie of released) {
+          try {
+            const revenue = await fetchMovieRevenue(movie.id);
+            movie.revenue = revenue;
+          } catch (e) {
+            movie.revenue = 0;
+          }
+        }
+        // Update cache with new revenue data
+        movieCache[year].data = movies;
+        console.log(`Updated box office for released movies in ${year}`);
+      }
+
       console.log(`Refreshed TMDB cache for year ${year}`);
     } catch (e) {
       console.error(`Failed to refresh TMDB cache for year ${year}:`, e.message);

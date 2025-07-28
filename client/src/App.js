@@ -660,10 +660,10 @@ function App() {
                       <div className="movie-info">
                         <div className="movie-title">{searchedMovie.title}</div>
                         <div className="movie-date">{searchedMovie.release_date}</div>
-                        {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && new Date(searchedMovie.release_date).getMonth() < new Date().getMonth()) ? (
+                        {new Date(searchedMovie.release_date) <= new Date() ? (
                           searchedMovie.revenue > 0 && <div className="movie-revenue">Box Office: ${searchedMovie.revenue.toLocaleString()}</div>
                         ) : null}
-                        {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && new Date(searchedMovie.release_date).getMonth() < new Date().getMonth()) ? (
+                        {new Date(searchedMovie.release_date) <= new Date() ? (
                           <div className="movie-rating">
                             IMDb Rating:<br/>
                             {ratings[searchedMovie.id] && ratings[searchedMovie.id] !== 'N/A' ? `${ratings[searchedMovie.id]}/10` : 'N/A'}
@@ -678,28 +678,24 @@ function App() {
                       <div key={month} style={{ marginBottom: '2rem' }}>
                         <h2>{month} {selectedYear}</h2>
                         <div className="movie-list">
-                          {titlesTabGrouped[idx].map((movie) => (
-                            <div className="movie-card" key={movie.id}>
-                              <img
-                                src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
-                                alt={movie.title}
-                                className="movie-poster"
-                              />
-                              <div className="movie-info">
-                                <div className="movie-title">{movie.title}</div>
-                                <div className="movie-date">{movie.release_date}</div>
-                                {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
-                                  movie.revenue > 0 && <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>
-                                ) : null}
-                                {selectedYear < new Date().getFullYear() || (selectedYear === new Date().getFullYear() && idx < new Date().getMonth()) ? (
-                                  <div className="movie-rating">
-                                    IMDb Rating:<br/>
-                                    {ratings[movie.id] && ratings[movie.id] !== 'N/A' ? `${ratings[movie.id]}/10` : 'N/A'}
-                                  </div>
-                                ) : null}
+                          {titlesTabGrouped[idx].map((movie) => {
+                            const isReleased = new Date(movie.release_date) <= new Date();
+                            return (
+                              <div className="movie-card" key={movie.id}>
+                                <img
+                                  src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
+                                  alt={movie.title}
+                                  className="movie-poster"
+                                />
+                                <div className="movie-info">
+                                  <div className="movie-title">{movie.title}</div>
+                                  <div className="movie-date">{movie.release_date}</div>
+                                  {isReleased && movie.revenue > 0 && <div className="movie-revenue">Box Office: ${movie.revenue.toLocaleString()}</div>}
+                                  {isReleased && <div className="movie-rating">IMDb Rating:<br/>{ratings[movie.id] && ratings[movie.id] !== 'N/A' ? `${ratings[movie.id]}/10` : 'N/A'}</div>}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     ) : null
