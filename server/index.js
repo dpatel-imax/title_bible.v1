@@ -177,7 +177,7 @@ app.get('/api/omdb-rating', async (req, res) => {
     const { imdb_id, title, year } = req.query;
     let cacheKey = imdb_id || `${title}_${year}`;
     if (omdbCache[cacheKey]) {
-      return res.json({ imdbRating: omdbCache[cacheKey] });
+      return res.json(omdbCache[cacheKey]);
     }
     let url;
     if (imdb_id) {
@@ -189,11 +189,15 @@ app.get('/api/omdb-rating', async (req, res) => {
     }
     console.log('OMDb URL:', url); // Debug log
     const response = await axios.get(url);
-    const imdbRating = response.data.imdbRating || null;
-    omdbCache[cacheKey] = imdbRating;
-    res.json({ imdbRating });
+    const omdbData = response.data;
+    
+    // Cache the full response data
+    omdbCache[cacheKey] = omdbData;
+    
+    // Return the full OMDb response
+    res.json(omdbData);
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch OMDb rating', details: error.message });
+    res.status(500).json({ error: 'Failed to fetch OMDb data', details: error.message });
   }
 });
 
