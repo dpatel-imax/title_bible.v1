@@ -148,6 +148,60 @@ function App() {
   const searchInputRef = useRef(null);
   const [ratings, setRatings] = useState({});
 
+  // Add state for movie detail popup
+  const [selectedMovie, setSelectedMovie] = useState(null);
+  const [movieDetails, setMovieDetails] = useState(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Function to fetch movie details from OMDb
+  const fetchMovieDetails = async (movie) => {
+    setLoadingDetails(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`);
+      const data = await response.json();
+      
+      // Handle both old format and new full OMDb response format
+      setMovieDetails({
+        title: movie.title,
+        year: new Date(movie.release_date).getFullYear(),
+        imdbRating: data.imdbRating || null,
+        plot: data.Plot || movie.overview || 'Plot not available',
+        cast: data.Actors || 'Cast information not available',
+        writer: data.Writer || 'Writer information not available',
+        genre: data.Genre || 'Genre not available',
+        director: data.Director || 'Director information not available',
+        runtime: data.Runtime || 'Runtime not available',
+        awards: data.Awards || 'Awards information not available'
+      });
+    } catch (error) {
+      console.error('Error fetching movie details:', error);
+      setMovieDetails({
+        title: movie.title,
+        year: new Date(movie.release_date).getFullYear(),
+        plot: movie.overview || 'Plot not available',
+        cast: 'Cast information not available',
+        writer: 'Writer information not available',
+        genre: 'Genre not available',
+        director: 'Director information not available',
+        runtime: 'Runtime not available',
+        awards: 'Awards information not available'
+      });
+    }
+    setLoadingDetails(false);
+  };
+
+  // Function to handle movie click
+  const handleMovieClick = (movie) => {
+    setSelectedMovie(movie);
+    fetchMovieDetails(movie);
+  };
+
+  // Function to close movie details popup
+  const closeMovieDetails = () => {
+    setSelectedMovie(null);
+    setMovieDetails(null);
+  };
+
   // Calendar tab state
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
   const [calendarView, setCalendarView] = useState('month'); // 'month' or 'week'
@@ -337,16 +391,18 @@ function App() {
     return getTitlesTabMoviesByMonth(getMoviesArray(movies, selectedYear), selectedYear);
   }, [movies, selectedYear]);
 
-  // Fetch IMDb ratings for visible movies in Titles tab
+  // Update the ratings fetching to handle the new OMDb response format
   useEffect(() => {
     if (activeTab === 'titles') {
       const moviesForRatings = Array.isArray(moviesToShow) ? moviesToShow : [];
       moviesForRatings.forEach(movie => {
         if (movie && movie.id && ratings[movie.id] === undefined && movie.title && movie.release_date) {
-          fetch(`https://title-bible.onrender.com/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
+          fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
             .then(res => res.json())
             .then(data => {
-              setRatings(r => ({ ...r, [movie.id]: data.imdbRating || 'N/A' }));
+              // Handle both old format (data.imdbRating) and new format (data.imdbRating from full response)
+              const rating = data.imdbRating || 'N/A';
+              setRatings(r => ({ ...r, [movie.id]: rating }));
             })
             .catch(() => {
               setRatings(r => ({ ...r, [movie.id]: 'N/A' }));
@@ -651,7 +707,7 @@ function App() {
               <div>
                 {searchedMovie ? (
                   <div className="movie-list">
-                    <div className="movie-card" key={searchedMovie.id}>
+                    <div className="movie-card" key={searchedMovie.id} onClick={() => handleMovieClick(searchedMovie)} style={{ cursor: 'pointer' }}>
                       <img
                         src={searchedMovie.poster_path ? `${TMDB_IMAGE_BASE}${searchedMovie.poster_path}` : PLACEHOLDER_POSTER}
                         alt={searchedMovie.title}
@@ -681,7 +737,7 @@ function App() {
                           {titlesTabGrouped[idx].map((movie) => {
                             const isReleased = new Date(movie.release_date) <= new Date();
                             return (
-                              <div className="movie-card" key={movie.id}>
+                              <div className="movie-card" key={movie.id} onClick={() => handleMovieClick(movie)} style={{ cursor: 'pointer' }}>
                                 <img
                                   src={movie.poster_path ? `${TMDB_IMAGE_BASE}${movie.poster_path}` : PLACEHOLDER_POSTER}
                                   alt={movie.title}
@@ -775,6 +831,58 @@ function App() {
           </div>
         )}
       </main>
+      {selectedMovie && (
+        <div className="movie-details-modal-overlay" onClick={closeMovieDetails}>
+          <div className="movie-details-modal" onClick={e => e.stopPropagation()}>
+            <button onClick={closeMovieDetails} className="movie-details-close-btn">&times;</button>
+            {loadingDetails ? (
+              <div className="movie-details-loading">Loading movie details...</div>
+            ) : movieDetails ? (
+              <div className="movie-details-content">
+                <h2>{movieDetails.title} ({movieDetails.year})</h2>
+                <div className="movie-details-section">
+                  <h3>Plot</h3>
+                  <p>{movieDetails.plot}</p>
+                </div>
+                <div className="movie-details-section">
+                  <h3>Cast</h3>
+                  <p>{movieDetails.cast}</p>
+                </div>
+                <div className="movie-details-section">
+                  <h3>Director</h3>
+                  <p>{movieDetails.director}</p>
+                </div>
+                <div className="movie-details-section">
+                  <h3>Writers</h3>
+                  <p>{movieDetails.writer}</p>
+                </div>
+                <div className="movie-details-section">
+                  <h3>Genre</h3>
+                  <p>{movieDetails.genre}</p>
+                </div>
+                <div className="movie-details-section">
+                  <h3>Runtime</h3>
+                  <p>{movieDetails.runtime}</p>
+                </div>
+                {movieDetails.imdbRating && (
+                  <div className="movie-details-section">
+                    <h3>IMDb Rating</h3>
+                    <p>{movieDetails.imdbRating}/10</p>
+                  </div>
+                )}
+                {movieDetails.awards && movieDetails.awards !== 'Awards information not available' && (
+                  <div className="movie-details-section">
+                    <h3>Awards</h3>
+                    <p>{movieDetails.awards}</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="movie-details-error">Error loading movie details</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

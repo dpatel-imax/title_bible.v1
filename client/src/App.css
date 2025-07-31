@@ -163,12 +163,12 @@ main {
   margin: 0;
   padding: 0 0 1rem 0;
   position: relative;
-  z-index: 1000; /* Higher z-index to stay above dev tools */
+  z-index: 1000; 
   flex: 1;
 }
 
 .search-bar-centered {
-  position: fixed; /* Change to fixed positioning */
+  position: absolute; 
   right: 2rem; /* Adjust right position */
   top: 80px; /* Adjust top position to be below header */
   transform: none;
@@ -943,5 +943,143 @@ main {
   .titles-header {
     flex-direction: column;
     gap: 0.5rem;
+  }
+}
+
+/* Movie Details Popup Modal */
+.movie-details-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0,0,0,0.25);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.movie-details-modal {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  padding: 2rem 2.5rem 2rem 2.5rem;
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: fadeIn 0.2s;
+  position: relative;
+}
+
+.movie-details-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1.5rem;
+  background: #eee;
+  border: none;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  font-size: 1.3rem;
+  color: #222;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.movie-details-close-btn:hover {
+  background: #61dafb;
+  color: #222;
+}
+
+.movie-details-content {
+  width: 100%;
+  text-align: left;
+}
+
+.movie-details-content h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  color: #222;
+  text-align: center;
+}
+
+.movie-details-section {
+  margin-bottom: 1.5rem;
+}
+
+.movie-details-section h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: bold;
+}
+
+.movie-details-section p {
+  margin: 0;
+  font-size: 1rem;
+  color: #555;
+  line-height: 1.5;
+}
+
+.movie-details-loading {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #666;
+  padding: 2rem;
+}
+
+.movie-details-error {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #d32f2f;
+  padding: 2rem;
+}
+
+/* Responsive design for movie details modal */
+@media (max-width: 768px) {
+  .movie-details-modal {
+    min-width: 320px;
+    max-width: 90vw;
+    padding: 1.5rem 2rem;
+    margin: 1rem;
+  }
+  
+  .movie-details-content h2 {
+    font-size: 1.3rem;
+  }
+  
+  .movie-details-section h3 {
+    font-size: 1rem;
+  }
+  
+  .movie-details-section p {
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 479px) {
+  .movie-details-modal {
+    min-width: 280px;
+    padding: 1rem 1.5rem;
+  }
+  
+  .movie-details-content h2 {
+    font-size: 1.2rem;
+  }
+  
+  .movie-details-close-btn {
+    top: 0.5rem;
+    right: 1rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    font-size: 1.1rem;
   }
 }
