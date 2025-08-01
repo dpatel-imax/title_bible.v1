@@ -77,12 +77,16 @@ async function performDailyUpdate() {
       } catch (e) {
         movie.revenue = 0;
       }
-      
-      // Fetch IMDb data for newly released movies (within last 30 days)
+    }
+    
+    // Fetch IMDb data for all movies (released and upcoming) within 30 days of release
+    const allMovies = movies.filter(m => m.release_date);
+    for (const movie of allMovies) {
       const releaseDate = new Date(movie.release_date);
       const daysSinceRelease = (today - releaseDate) / (1000 * 60 * 60 * 24);
       
-      if (daysSinceRelease <= 30) {
+      // Pre-fetch IMDb data for movies within 30 days of release (past or future)
+      if (Math.abs(daysSinceRelease) <= 30) {
         try {
           const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
           if (!omdbCache[cacheKey]) {
@@ -90,7 +94,7 @@ async function performDailyUpdate() {
             const omdbResponse = await axios.get(omdbUrl);
             if (omdbResponse.data.Response === 'True') {
               omdbCache[cacheKey] = omdbResponse.data;
-              console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days since release)`);
+              console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days ${daysSinceRelease > 0 ? 'since' : 'until'} release)`);
             }
           }
         } catch (e) {
