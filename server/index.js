@@ -16,6 +16,10 @@ const omdbCache = {};
 const movieCache = {}; // { '2025': { data: [...], lastUpdated: Date } }
 const CACHE_TTL_HOURS = 24;
 
+// Track if we've done daily update today
+let lastDailyUpdate = null;
+const DAILY_UPDATE_HOUR = 2; // 2 AM
+
 async function fetchMoviesForYear(year) {
   let allResults = [];
   const now = new Date();
@@ -40,58 +44,68 @@ async function fetchAndCacheMoviesForYear(year) {
   return data;
 }
 
-// Nightly refresh at 2am server time
+// Nightly refresh at 2am server time (backup in case server stays awake)
 cron.schedule('0 2 * * *', async () => {
-  const years = Object.keys(movieCache);
-  const currentYear = new Date().getFullYear();
-  for (const year of years) {
-    try {
-      // Refresh movie list
-      const movies = await fetchAndCacheMoviesForYear(year);
+  await performDailyUpdate();
+});
 
-      // If it's the current year, update revenue and IMDb data for all released movies
-      if (parseInt(year) === currentYear) {
-        const today = new Date();
-        const released = movies.filter(m => m.release_date && new Date(m.release_date) <= today);
-        for (const movie of released) {
-          try {
-            const revenue = await fetchMovieRevenue(movie.id);
-            movie.revenue = revenue;
-          } catch (e) {
-            movie.revenue = 0;
-          }
-          
-          // Fetch IMDb data for newly released movies (within last 30 days)
-          const releaseDate = new Date(movie.release_date);
-          const daysSinceRelease = (today - releaseDate) / (1000 * 60 * 60 * 24);
-          
-          if (daysSinceRelease <= 30) {
-            try {
-              const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
-              if (!omdbCache[cacheKey]) {
-                const omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
-                const omdbResponse = await axios.get(omdbUrl);
-                if (omdbResponse.data.Response === 'True') {
-                  omdbCache[cacheKey] = omdbResponse.data;
-                  console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days since release)`);
-                }
-              }
-            } catch (e) {
-              console.log(`Failed to pre-fetch IMDb data for ${movie.title}:`, e.message);
+// Function to perform daily update
+async function performDailyUpdate() {
+  const today = new Date();
+  const todayDate = today.toDateString();
+  
+  // Check if we've already done daily update today
+  if (lastDailyUpdate === todayDate) {
+    return;
+  }
+  
+  console.log('Performing daily update for current year movies...');
+  lastDailyUpdate = todayDate;
+  
+  const currentYear = today.getFullYear();
+  
+  try {
+    // Refresh movie list for current year
+    const movies = await fetchAndCacheMoviesForYear(currentYear);
+    
+    // Update revenue and IMDb data for all released movies
+    const released = movies.filter(m => m.release_date && new Date(m.release_date) <= today);
+    for (const movie of released) {
+      try {
+        const revenue = await fetchMovieRevenue(movie.id);
+        movie.revenue = revenue;
+      } catch (e) {
+        movie.revenue = 0;
+      }
+      
+      // Fetch IMDb data for newly released movies (within last 30 days)
+      const releaseDate = new Date(movie.release_date);
+      const daysSinceRelease = (today - releaseDate) / (1000 * 60 * 60 * 24);
+      
+      if (daysSinceRelease <= 30) {
+        try {
+          const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
+          if (!omdbCache[cacheKey]) {
+            const omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
+            const omdbResponse = await axios.get(omdbUrl);
+            if (omdbResponse.data.Response === 'True') {
+              omdbCache[cacheKey] = omdbResponse.data;
+              console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days since release)`);
             }
           }
+        } catch (e) {
+          console.log(`Failed to pre-fetch IMDb data for ${movie.title}:`, e.message);
         }
-        // Update cache with new revenue data
-        movieCache[year].data = movies;
-        console.log(`Updated box office and IMDb data for released movies in ${year}`);
       }
-
-      console.log(`Refreshed TMDB cache for year ${year}`);
-    } catch (e) {
-      console.error(`Failed to refresh TMDB cache for year ${year}:`, e.message);
     }
+    
+    // Update cache with new revenue data
+    movieCache[currentYear].data = movies;
+    console.log(`Daily update completed: Updated box office and IMDb data for released movies in ${currentYear}`);
+  } catch (e) {
+    console.error('Failed to perform daily update:', e.message);
   }
-});
+}
 
 async function fetchMovieRevenue(movieId) {
   const response = await axios.get(
@@ -105,6 +119,12 @@ app.get('/api/movies', async (req, res) => {
     const year = parseInt(req.query.year) || new Date().getFullYear();
     const currentYear = new Date().getFullYear();
     const today = new Date();
+    
+    // Trigger daily update on first request of the day for current year
+    if (year === currentYear) {
+      await performDailyUpdate();
+    }
+    
     // Serve from cache if available and fresh
     const cacheEntry = movieCache[year];
     let movies;
