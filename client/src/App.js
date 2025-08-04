@@ -157,7 +157,13 @@ function App() {
   const fetchMovieDetails = async (movie) => {
     setLoadingDetails(true);
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`);
+      // Special case for Fantastic Four: First Steps - use OMDb title format
+      let title = movie.title;
+      if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+        title = 'Fantastic Four: First Steps';
+      }
+      
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(title)}&year=${new Date(movie.release_date).getFullYear()}`);
       const data = await response.json();
       
       // Handle both old format and new full OMDb response format
