@@ -88,24 +88,30 @@ async function performDailyUpdate() {
       // Pre-fetch IMDb data for movies within 30 days of release (past or future)
       if (Math.abs(daysSinceRelease) <= 30) {
         try {
-          let cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
-          let omdbUrl;
-          
-          // Special case for Fantastic Four: First Steps - use OMDb for all data
+          // Skip Fantastic Four from regular processing - handle it separately
           if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
-            omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
-            cacheKey = `Fantastic Four: First Steps_${releaseDate.getFullYear()}`; // Use OMDb title format for cache key
+            const omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
+            const cacheKey = `Fantastic Four: First Steps_${releaseDate.getFullYear()}`;
             console.log(`Special case: Pre-fetching all data for Fantastic Four from OMDb`);
-          } else {
-            omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
-          }
-          
-          if (!omdbCache[cacheKey]) {
             
-            const omdbResponse = await axios.get(omdbUrl);
-            if (omdbResponse.data.Response === 'True') {
-              omdbCache[cacheKey] = omdbResponse.data;
-              console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days ${daysSinceRelease > 0 ? 'since' : 'until'} release)`);
+            if (!omdbCache[cacheKey]) {
+              const omdbResponse = await axios.get(omdbUrl);
+              if (omdbResponse.data.Response === 'True') {
+                omdbCache[cacheKey] = omdbResponse.data;
+                console.log(`Pre-fetched IMDb data for Fantastic Four: First Steps (${daysSinceRelease.toFixed(1)} days ${daysSinceRelease > 0 ? 'since' : 'until'} release)`);
+              }
+            }
+          } else {
+            // Regular processing for all other movies
+            const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
+            const omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
+            
+            if (!omdbCache[cacheKey]) {
+              const omdbResponse = await axios.get(omdbUrl);
+              if (omdbResponse.data.Response === 'True') {
+                omdbCache[cacheKey] = omdbResponse.data;
+                console.log(`Pre-fetched IMDb data for ${movie.title} (${daysSinceRelease.toFixed(1)} days ${daysSinceRelease > 0 ? 'since' : 'until'} release)`);
+              }
             }
           }
         } catch (e) {
