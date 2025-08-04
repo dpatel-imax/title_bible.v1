@@ -88,17 +88,19 @@ async function performDailyUpdate() {
       // Pre-fetch IMDb data for movies within 30 days of release (past or future)
       if (Math.abs(daysSinceRelease) <= 30) {
         try {
-          const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
+          let cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
+          let omdbUrl;
+          
+          // Special case for Fantastic Four: First Steps - use OMDb for all data
+          if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+            omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
+            cacheKey = `Fantastic Four: First Steps_${releaseDate.getFullYear()}`; // Use OMDb title format for cache key
+            console.log(`Special case: Pre-fetching all data for Fantastic Four from OMDb`);
+          } else {
+            omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
+          }
+          
           if (!omdbCache[cacheKey]) {
-            let omdbUrl;
-            
-            // Special case for Fantastic Four: First Steps - use OMDb for all data
-            if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
-              omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
-              console.log(`Special case: Pre-fetching all data for Fantastic Four from OMDb`);
-            } else {
-              omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
-            }
             
             const omdbResponse = await axios.get(omdbUrl);
             if (omdbResponse.data.Response === 'True') {
