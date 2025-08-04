@@ -90,7 +90,15 @@ async function performDailyUpdate() {
         try {
           const cacheKey = `${movie.title}_${releaseDate.getFullYear()}`;
           if (!omdbCache[cacheKey]) {
-            const omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
+            let omdbUrl;
+            
+            // Special case for Fantastic Four: First Steps
+            if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+              omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
+            } else {
+              omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
+            }
+            
             const omdbResponse = await axios.get(omdbUrl);
             if (omdbResponse.data.Response === 'True') {
               omdbCache[cacheKey] = omdbResponse.data;
@@ -227,7 +235,12 @@ app.get('/api/omdb-rating', async (req, res) => {
     if (imdb_id) {
       url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${imdb_id}`;
     } else if (title) {
-      url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}${year ? `&y=${year}` : ''}`;
+      // Special case for Fantastic Four: First Steps
+      if (title.toLowerCase().includes('fantastic four') && title.toLowerCase().includes('first steps')) {
+        url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps${year ? `&y=${year}` : ''}`;
+      } else {
+        url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}${year ? `&y=${year}` : ''}`;
+      }
     } else {
       return res.status(400).json({ error: 'imdb_id or title required' });
     }
