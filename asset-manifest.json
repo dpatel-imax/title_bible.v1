@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/title_bible.v1/static/css/main.c78dd4fa.css",
+    "main.js": "/title_bible.v1/static/js/main.e21bc22f.js",
+    "static/js/453.a3c1d153.chunk.js": "/title_bible.v1/static/js/453.a3c1d153.chunk.js",
+    "index.html": "/title_bible.v1/index.html",
+    "main.c78dd4fa.css.map": "/title_bible.v1/static/css/main.c78dd4fa.css.map",
+    "main.e21bc22f.js.map": "/title_bible.v1/static/js/main.e21bc22f.js.map",
+    "453.a3c1d153.chunk.js.map": "/title_bible.v1/static/js/453.a3c1d153.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.c78dd4fa.css",
+    "static/js/main.e21bc22f.js"
+  ]
+}
