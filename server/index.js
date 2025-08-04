@@ -95,6 +95,7 @@ async function performDailyUpdate() {
             // Special case for Fantastic Four: First Steps
             if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
               omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
+              console.log(`Using special Fantastic Four URL: ${omdbUrl}`);
             } else {
               omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
             }
@@ -238,6 +239,7 @@ app.get('/api/omdb-rating', async (req, res) => {
       // Special case for Fantastic Four: First Steps
       if (title.toLowerCase().includes('fantastic four') && title.toLowerCase().includes('first steps')) {
         url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps${year ? `&y=${year}` : ''}`;
+        console.log(`Frontend: Using special Fantastic Four URL: ${url}`);
       } else {
         url = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(title)}${year ? `&y=${year}` : ''}`;
       }
