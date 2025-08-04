@@ -403,7 +403,13 @@ function App() {
       const moviesForRatings = Array.isArray(moviesToShow) ? moviesToShow : [];
       moviesForRatings.forEach(movie => {
         if (movie && movie.id && ratings[movie.id] === undefined && movie.title && movie.release_date) {
-          fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(movie.title)}&year=${new Date(movie.release_date).getFullYear()}`)
+          // Special case for Fantastic Four: First Steps - use OMDb title format
+          let title = movie.title;
+          if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+            title = 'Fantastic Four: First Steps';
+          }
+          
+          fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(title)}&year=${new Date(movie.release_date).getFullYear()}`)
             .then(res => res.json())
             .then(data => {
               // Handle both old format (data.imdbRating) and new format (data.imdbRating from full response)
