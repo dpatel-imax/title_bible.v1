@@ -92,10 +92,10 @@ async function performDailyUpdate() {
           if (!omdbCache[cacheKey]) {
             let omdbUrl;
             
-            // Special case for Fantastic Four: First Steps
+            // Special case for Fantastic Four: First Steps - use OMDb for all data
             if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
               omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=Fantastic%20Four%3A%20First%20Steps&y=${releaseDate.getFullYear()}`;
-              console.log(`Using special Fantastic Four URL: ${omdbUrl}`);
+              console.log(`Special case: Pre-fetching all data for Fantastic Four from OMDb`);
             } else {
               omdbUrl = `http://www.omdbapi.com/?apikey=${OMDB_API_KEY}&t=${encodeURIComponent(movie.title)}&y=${releaseDate.getFullYear()}`;
             }
@@ -229,6 +229,12 @@ app.get('/api/omdb-rating', async (req, res) => {
   try {
     const { imdb_id, title, year } = req.query;
     let cacheKey = imdb_id || `${title}_${year}`;
+    
+    // Special cache key for Fantastic Four to handle title mismatch
+    if (title && title.toLowerCase().includes('fantastic four') && title.toLowerCase().includes('first steps')) {
+      cacheKey = `Fantastic Four: First Steps_${year}`;
+    }
+    
     if (omdbCache[cacheKey]) {
       return res.json(omdbCache[cacheKey]);
     }
