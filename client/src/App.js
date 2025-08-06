@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Select from 'react-select';
 import './App.css';
 
-// Placeholder IMAX logo URL (replace with a real one if available)
 const imaxLogo = 'https://1000logos.net/wp-content/uploads/2021/05/IMAX-logo.png';
 const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w200';
 const PLACEHOLDER_POSTER = 'https://via.placeholder.com/100x150?text=No+Image';
@@ -155,11 +154,12 @@ function App() {
 
   // Function to fetch movie details from OMDb
   const fetchMovieDetails = async (movie) => {
+    
     setLoadingDetails(true);
     try {
       // Special case for Fantastic Four: First Steps - use OMDb title format
       let title = movie.title;
-      if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+      if (title.includes("Fantastic")) {
         title = 'Fantastic Four: First Steps';
       }
       
@@ -168,6 +168,7 @@ function App() {
       
       // Handle both old format and new full OMDb response format
       setMovieDetails({
+        
         title: movie.title,
         year: new Date(movie.release_date).getFullYear(),
         imdbRating: data.imdbRating || null,
@@ -179,6 +180,7 @@ function App() {
         runtime: data.Runtime || 'Runtime not available',
         awards: data.Awards || 'Awards information not available'
       });
+      
     } catch (error) {
       console.error('Error fetching movie details:', error);
       setMovieDetails({
@@ -405,7 +407,7 @@ function App() {
         if (movie && movie.id && ratings[movie.id] === undefined && movie.title && movie.release_date) {
           // Special case for Fantastic Four: First Steps - use OMDb title format
           let title = movie.title;
-          if (movie.title.toLowerCase().includes('fantastic four') && movie.title.toLowerCase().includes('first steps')) {
+          if (title.includes('Fantastic')) {
             title = 'Fantastic Four: First Steps';
           }
           
