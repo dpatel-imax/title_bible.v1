@@ -154,13 +154,15 @@ function App() {
 
   // Function to fetch movie details from OMDb
   const fetchMovieDetails = async (movie) => {
-    
     setLoadingDetails(true);
     try {
       // Special case for Fantastic Four: First Steps - use OMDb title format
       let title = movie.title;
       if (title.includes("Fantastic")) {
         title = 'Fantastic Four: First Steps';
+      }
+      if (title.includes("Ne Zha")) {
+        title = 'Ne Zha II'
       }
       
       const response = await fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(title)}&year=${new Date(movie.release_date).getFullYear()}`);
@@ -209,6 +211,23 @@ function App() {
     setSelectedMovie(null);
     setMovieDetails(null);
   };
+
+  // Handle escape key to close movie details popup
+  useEffect(() => {
+    const handleEscapeKey = (event) => {
+      if (event.key === 'Escape' && selectedMovie) {
+        closeMovieDetails();
+      }
+    };
+
+    if (selectedMovie) {
+      document.addEventListener('keydown', handleEscapeKey);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [selectedMovie]);
 
   // Calendar tab state
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
@@ -409,6 +428,9 @@ function App() {
           let title = movie.title;
           if (title.includes('Fantastic')) {
             title = 'Fantastic Four: First Steps';
+          }
+          if (title.includes('Ne Zha')) {
+            title = 'Ne Zha II';
           }
           
           fetch(`${process.env.REACT_APP_BACKEND_URL || 'https://title-bible.onrender.com'}/api/omdb-rating?title=${encodeURIComponent(title)}&year=${new Date(movie.release_date).getFullYear()}`)
